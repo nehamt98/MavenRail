@@ -31,3 +31,7 @@ python train.py
 ```
 python inference.py
 ```
+## run pre-commits
+```
+pre-commit run --all-files
+```
