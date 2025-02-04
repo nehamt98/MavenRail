@@ -17,7 +17,7 @@ def main():
     X_test = pd.read_csv(os.path.join(base_path, "datasets", "test", "data.csv"))
     y_test = pd.read_csv(os.path.join(base_path, "datasets", "test", "labels.csv"))
 
-    with open("model.pkl", "rb") as f:
+    with open(os.path.join("log_regression", "model.pkl"), "rb") as f:
         loaded_model = pickle.load(f)
 
     # Predict for training and test data

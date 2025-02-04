@@ -1,10 +1,11 @@
 import argparse
 import sys
 
-from utils.dataset import (
+from utils.main_utils import (
     load_dataset,
     clean_dataset,
     process_time,
+    reduce_columns,
     transformation,
     save_csv_files,
     split_dataset,
@@ -19,6 +20,9 @@ def main(args):
     cleaned_df = clean_dataset(df)
 
     processed_df = process_time(cleaned_df)
+
+    if args.columns:
+        processed_df = reduce_columns(args.columns)
 
     data, labels = transformation(processed_df)
 
@@ -42,6 +46,8 @@ if __name__ == "__main__":
     parser.add_argument("--test_size", type=float, required=True)
 
     parser.add_argument("--random_state", type=int, required=False)
+
+    parser.add_argument("--columns", type=str, nargs="+", required=False)
 
     args = parser.parse_args()
     main(args)
