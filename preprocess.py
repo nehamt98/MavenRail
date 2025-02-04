@@ -24,7 +24,7 @@ def main(args):
     if args.columns:
         processed_df = reduce_columns(args.columns)
 
-    data, labels = transformation(processed_df)
+    data, labels = transformation(processed_df, save_encoder_flag=True)
 
     data_file_path, label_file_path = save_csv_files(data, labels)
 

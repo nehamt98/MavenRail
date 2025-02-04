@@ -176,3 +176,5 @@ datasets/test/
 datasets/data.csv
 datasets/labels.csv
 datasets/TrainRidesReduced.csv
+.DS_Store
+**/.DS_Store

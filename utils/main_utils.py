@@ -4,8 +4,12 @@ from pathlib import Path
 import pickle
 
 from loguru import logger
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.model_selection import train_test_split
+
+# File paths for saving encoders
+OHE_ENCODER_FILE = "onehot_encoder.pkl"
+LABEL_ENCODER_FILE = "label_encoders.pkl"
 
 
 def load_dataset(filename: str) -> pd.DataFrame:
@@ -55,67 +59,78 @@ def process_time(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame
     """
-    # Subtract Actual Arrival with Scheduled Arrival
-    df["Actual Arrival Time"] = pd.to_timedelta(df["Actual Arrival Time"])
-    df["Arrival Time"] = pd.to_timedelta(df["Arrival Time"])
+    if all(col in df.columns for col in ["Actual Arrival Time", "Arrival Time"]):
+        # Subtract Actual Arrival with Scheduled Arrival
+        df["Actual Arrival Time"] = pd.to_timedelta(df["Actual Arrival Time"])
+        df["Arrival Time"] = pd.to_timedelta(df["Arrival Time"])
 
-    # Calculate the delay, accounting for the potential next day overflow
-    df["DelayInMinutes"] = (
-        df["Actual Arrival Time"] - df["Arrival Time"]
-    ).dt.total_seconds() / 60
-    # If delay is negative (next day), add 24 hours (1 day = 1440 minutes)
-    df["DelayInMinutes"] = df["DelayInMinutes"].apply(
-        lambda x: x + 1440 if x < 0 else x
-    )  # When journey status is on time, set it to null. When journey status is cancelled, it is already null.
+        # Calculate the delay, accounting for the potential next day overflow
+        df["DelayInMinutes"] = (
+            df["Actual Arrival Time"] - df["Arrival Time"]
+        ).dt.total_seconds() / 60
+        # If delay is negative (next day), add 24 hours (1 day = 1440 minutes)
+        df["DelayInMinutes"] = df["DelayInMinutes"].apply(
+            lambda x: x + 1440 if x < 0 else x
+        )  # When journey status is on time, set it to null. When journey status is cancelled, it is already null.
 
-    df["DelayInMinutes"] = df["DelayInMinutes"].fillna(0)
+        df["DelayInMinutes"] = df["DelayInMinutes"].fillna(0)
 
     return df
 
 
-def transformation(df: pd.DataFrame):
+def save_encoders(
+    onehot_encoder,
+    label_encoders,
+    ohe_filename=OHE_ENCODER_FILE,
+    le_filename=LABEL_ENCODER_FILE,
+):
+    """Save OneHotEncoder and LabelEncoders using pickle."""
+    base_path = Path().resolve()
+    model_path = os.path.join(base_path, "log_regression")
+    os.makedirs(model_path, exist_ok=True)
+
+    with open(os.path.join(model_path, ohe_filename), "wb") as f:
+        pickle.dump(onehot_encoder, f)
+    with open(os.path.join(model_path, le_filename), "wb") as f:
+        pickle.dump(label_encoders, f)
+
+
+def load_encoders(ohe_filename=OHE_ENCODER_FILE, le_filename=LABEL_ENCODER_FILE):
+    """Load OneHotEncoder and LabelEncoders from pickle files."""
+    base_path = Path().resolve()
+    model_path = os.path.join(base_path, "log_regression")
+    os.makedirs(model_path, exist_ok=True)
+
+    with open(os.path.join(model_path, ohe_filename), "rb") as f:
+        onehot_encoder = pickle.load(f)
+    with open(os.path.join(model_path, le_filename), "rb") as f:
+        label_encoders = pickle.load(f)
+    return onehot_encoder, label_encoders
+
+
+def transformation(df: pd.DataFrame, save_encoder_flag=False, load_encoder_flag=False):
     """
-    Encode/Create dummies for categorical attributes and return the data and labels
+    Encode categorical attributes using OneHotEncoder and LabelEncoder.
+    Supports both training (saving encoders) and inference (loading encoders).
 
     Args:
-        df (pd.DataFrame)
+        df (pd.DataFrame): Input DataFrame
+        save_encoder_flag (bool): Saves encoders if True
+        load_encoder_flag (bool): Loads pre-trained encoders if True
 
     Returns:
-        pd.DataFrame: Data
-        pd.DataFrame: Labels
+        X (pd.DataFrame): Encoded feature data
+        y (pd.Series or None): Labels if available, else None
     """
 
-    categorical_columns_encode = [
-        "Reason for Delay",
-        "Departure Station",
-        "Arrival Destination",
-    ]
-    labelEncoder = [LabelEncoder()] * len(categorical_columns_encode)
-    labelEncoder_y = LabelEncoder()
-
-    # Encode categorical columns containing many categories
-    for i, col in enumerate(categorical_columns_encode):
-        if col in df.columns:
-            df[col] = labelEncoder[i].fit_transform(df[col])
-    # Encode dependent variable
-    df["Refund Request"] = labelEncoder_y.fit_transform(df["Refund Request"])
-
-    # To create dummy variable for journey.status with delayed and cancelled columns
-    if "Journey Status" in df.columns:
-        df["Journey Status"] = pd.Categorical(
-            df["Journey Status"],
-            categories=["On Time", "Delayed", "Cancelled"],
-            ordered=True,
-        )
-
-    # Define the independent variables
+    # Columns for encoding
     categorical_columns_encode = [
         "Reason for Delay",
         "Departure Station",
         "Arrival Destination",
     ]
     numerical_columns = ["Price", "DelayInMinutes"]
-    dummy_columns = [
+    onehot_columns = [
         "Payment Method",
         "Railcard",
         "Ticket Type",
@@ -123,23 +138,61 @@ def transformation(df: pd.DataFrame):
         "Journey Status",
     ]
 
-    # Select only the columns that exist in the DataFrame
-    X_numerical = df[[col for col in numerical_columns if col in df.columns]]
+    if load_encoder_flag:
+        encoder, label_encoders = load_encoders()
+    else:
+        label_encoders = {col: LabelEncoder() for col in categorical_columns_encode}
+        encoder = OneHotEncoder(
+            drop="first", sparse_output=False, handle_unknown="ignore"
+        )
 
-    X_categorical = df[[col for col in categorical_columns_encode if col in df.columns]]
+    # Label Encode categorical columns
+    for col in categorical_columns_encode:
+        if col in df.columns:
+            if load_encoder_flag:
+                df[col] = label_encoders[col].transform(df[col])
+            else:
+                df[col] = label_encoders[col].fit_transform(df[col])
 
-    X_dummies = pd.get_dummies(
-        df[[col for col in dummy_columns if col in df.columns]],
-        drop_first=True,
-    ).astype(int)
+    # Encode dependent variable
+    if "Refund Request" in df.columns:
+        df["Refund Request"] = df["Refund Request"].map({"No": 0, "Yes": 1})
 
-    # Concatenate all selected columns
-    X = pd.concat([X_dummies, X_categorical, X_numerical], axis=1)
+    # OneHotEncode categorical features
+    existing_onehot = [col for col in onehot_columns if col in df.columns]
 
-    # Define the dependent variable
-    y = df["Refund Request"]
+    if existing_onehot:
+        if load_encoder_flag:
+            encoded_array = encoder.transform(df[existing_onehot])
+        else:
+            encoded_array = encoder.fit_transform(df[existing_onehot])
 
-    return X, y
+        # Convert to DataFrame
+        encoded_df = pd.DataFrame(
+            encoded_array, columns=encoder.get_feature_names_out(existing_onehot)
+        )
+
+    # Save encoders after training
+    if save_encoder_flag:
+        save_encoders(encoder, label_encoders)
+
+    # Select numerical columns
+    existing_numerical = [col for col in numerical_columns if col in df.columns]
+    X_numerical = df[existing_numerical] if existing_numerical else pd.DataFrame()
+
+    # Select label-encoded categorical columns
+    existing_categorical = [
+        col for col in categorical_columns_encode if col in df.columns
+    ]
+    X_categorical = df[existing_categorical] if existing_categorical else pd.DataFrame()
+
+    # Combine feature DataFrames
+    X = pd.concat([X_numerical, X_categorical, encoded_df], axis=1)
+
+    # Define labels if available
+    y = df["Refund Request"] if "Refund Request" in df.columns else None
+
+    return (X, y) if y is not None else X
 
 
 def save_csv_files(data: pd.DataFrame, labels: pd.DataFrame):
