@@ -3,11 +3,11 @@ from fastapi.responses import RedirectResponse
 import uvicorn
 
 from src.schemas import TransactionData, InferenceData
-from src.refund_predictor import data_process, perform_inference
+from src.refund_predictor import data_process
 
 app = FastAPI(
-    title="My API",
-    description="This is a very fancy project",
+    title="MavenRail",
+    description="Predict the status of refund request based on based on various ticket-related factors",
     version="2.5.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/docs",

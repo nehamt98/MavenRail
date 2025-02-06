@@ -8,17 +8,21 @@ from pathlib import Path
 
 from sklearn.metrics import confusion_matrix, accuracy_score
 
+from utils.main_utils import load_model
+
 
 def main():
 
     base_path = Path().resolve()
+
+    # Load datasets
     y_train = pd.read_csv(os.path.join(base_path, "datasets", "train", "labels.csv"))
     X_train = pd.read_csv(os.path.join(base_path, "datasets", "train", "data.csv"))
     X_test = pd.read_csv(os.path.join(base_path, "datasets", "test", "data.csv"))
     y_test = pd.read_csv(os.path.join(base_path, "datasets", "test", "labels.csv"))
 
-    with open(os.path.join("log_regression", "model.pkl"), "rb") as f:
-        loaded_model = pickle.load(f)
+    # Load the model
+    loaded_model = load_model()["model"]
 
     # Predict for training and test data
     y_pred_prob_train = loaded_model.predict(X_train)

@@ -34,7 +34,7 @@ def load_dataset(filename: str) -> pd.DataFrame:
 
 def clean_dataset(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Imputation and data formatting are carried out for the columns - Railcard, Reason for Delay and Date of Journey
+    Imputation and data formatting are carried out for the columns - Railcard and Reason for Delay
 
     Args:
         df (pd.DataFrame): The loaded dataset
@@ -44,14 +44,14 @@ def clean_dataset(df: pd.DataFrame) -> pd.DataFrame:
     """
     df["Railcard"] = df["Railcard"].fillna("None")
     df["Reason for Delay"] = df["Reason for Delay"].fillna("Not Delayed")
-    df["Date of Journey"] = pd.to_datetime(df["Date of Journey"], format="%d/%m/%Y")
+    df["Reason for Delay"] = df["Reason for Delay"].replace("NA", "Not Delayed")
 
     return df
 
 
 def process_time(df: pd.DataFrame) -> pd.DataFrame:
     """
-    A new column 'DelayInMinutes' is calculated based on the Actual ans Scheduled arrival times
+    A new column 'DelayInMinutes' is calculated based on the Actual and Scheduled arrival times
 
     Args:
         df (pd.DataFrame)
@@ -84,7 +84,15 @@ def save_encoders(
     ohe_filename=OHE_ENCODER_FILE,
     le_filename=LABEL_ENCODER_FILE,
 ):
-    """Save OneHotEncoder and LabelEncoders using pickle."""
+    """
+    Save OneHotEncoder and LabelEncoders using pickle.
+
+    Args:
+        onehot_encoder (<class sklearn.preprocessing._encoders.OneHotEncoder>): One hot encoder fit on training data
+        label_encoders (<class 'sklearn.preprocessing._label.LabelEncoder'>): Label encoder fit on training data
+        ohe_filename (string, optional): File path to OHE. Defaults to OHE_ENCODER_FILE.
+        le_filename (string, optional): File path to LE. Defaults to LABEL_ENCODER_FILE.
+    """
     base_path = Path().resolve()
     model_path = os.path.join(base_path, "log_regression")
     os.makedirs(model_path, exist_ok=True)
@@ -96,7 +104,17 @@ def save_encoders(
 
 
 def load_encoders(ohe_filename=OHE_ENCODER_FILE, le_filename=LABEL_ENCODER_FILE):
-    """Load OneHotEncoder and LabelEncoders from pickle files."""
+    """
+    Load OneHotEncoder and LabelEncoders from pickle files.
+
+    Args:
+        ohe_filename (string, optional): File path to OHE. Defaults to OHE_ENCODER_FILE.
+        le_filename (string, optional): File path to LE. Defaults to LABEL_ENCODER_FILE.
+
+    Returns:
+        onehot_encoder (<class sklearn.preprocessing._encoders.OneHotEncoder>): One hot encoder fit on training data
+        label_encoders (<class 'sklearn.preprocessing._label.LabelEncoder'>): Label encoder fit on training data
+    """
     base_path = Path().resolve()
     model_path = os.path.join(base_path, "log_regression")
     os.makedirs(model_path, exist_ok=True)
@@ -115,8 +133,8 @@ def transformation(df: pd.DataFrame, save_encoder_flag=False, load_encoder_flag=
 
     Args:
         df (pd.DataFrame): Input DataFrame
-        save_encoder_flag (bool): Saves encoders if True
-        load_encoder_flag (bool): Loads pre-trained encoders if True
+        save_encoder_flag (bool, optional): Saves encoders if True
+        load_encoder_flag (bool, optional): Loads pre-trained encoders if True
 
     Returns:
         X (pd.DataFrame): Encoded feature data
@@ -138,10 +156,12 @@ def transformation(df: pd.DataFrame, save_encoder_flag=False, load_encoder_flag=
         "Journey Status",
     ]
 
+    # Load or initialise encoders based on flags
     if load_encoder_flag:
         encoder, label_encoders = load_encoders()
+
     else:
-        label_encoders = {col: LabelEncoder() for col in categorical_columns_encode}
+        label_encoders = {}
         encoder = OneHotEncoder(
             drop="first", sparse_output=False, handle_unknown="ignore"
         )
@@ -150,9 +170,12 @@ def transformation(df: pd.DataFrame, save_encoder_flag=False, load_encoder_flag=
     for col in categorical_columns_encode:
         if col in df.columns:
             if load_encoder_flag:
-                df[col] = label_encoders[col].transform(df[col])
+                if col in label_encoders.keys():
+                    df[col] = label_encoders[col].transform(df[col])
             else:
-                df[col] = label_encoders[col].fit_transform(df[col])
+                label_encoder = LabelEncoder()
+                df[col] = label_encoder.fit_transform(df[col])
+                label_encoders[col] = label_encoder
 
     # Encode dependent variable
     if "Refund Request" in df.columns:
@@ -163,13 +186,18 @@ def transformation(df: pd.DataFrame, save_encoder_flag=False, load_encoder_flag=
 
     if existing_onehot:
         if load_encoder_flag:
-            encoded_array = encoder.transform(df[existing_onehot])
+            valid_columns = [
+                col for col in existing_onehot if col in encoder.feature_names_in_
+            ]
+            if valid_columns:  # Proceed only if there are valid columns
+                encoded_array = encoder.transform(df[valid_columns])
         else:
             encoded_array = encoder.fit_transform(df[existing_onehot])
+            valid_columns = existing_onehot
 
         # Convert to DataFrame
         encoded_df = pd.DataFrame(
-            encoded_array, columns=encoder.get_feature_names_out(existing_onehot)
+            encoded_array, columns=encoder.get_feature_names_out(valid_columns)
         )
 
     # Save encoders after training
@@ -191,6 +219,11 @@ def transformation(df: pd.DataFrame, save_encoder_flag=False, load_encoder_flag=
 
     # Define labels if available
     y = df["Refund Request"] if "Refund Request" in df.columns else None
+
+    if load_encoder_flag:
+        # Drop columns that are not in the saved encoders. Mainly done for the numerical columns
+        feature_names = load_model()["feature_names"]
+        X = X[feature_names]
 
     return (X, y) if y is not None else X
 
@@ -274,6 +307,9 @@ def save_model(model):
     summary_df = summary.tables[1]
     summary_df.to_csv(os.path.join(model_path, "model_metrics.csv"), index=True)
 
+    # Save feature names
+    feature_names = model.params.keys()
+
     # Remove large data arrays to reduce size
     model._results.remove_data()
 
@@ -281,25 +317,46 @@ def save_model(model):
     os.makedirs(model_path, exist_ok=True)
 
     with open(os.path.join(model_path, "model.pkl"), "wb") as f:
-        pickle.dump(model, f)
-
+        pickle.dump({"model": model, "feature_names": list(feature_names)}, f)
     return summary
 
 
-def reduce_columns(columns):
-    """_summary_
+def reduce_columns(processed_df, columns):
+    """
+    Select columns that are passed to the function for model training
 
     Args:
-        columns (_type_): _description_
+        processed_df (pd.DataFrame): Complete dataframe
+        columns (List): Columns to be retained
+
+    Returns:
+        pd.DataFrame: Reduced dataframe
     """
     base_path = Path().resolve()
-    data = pd.read_csv(
-        os.path.join(base_path, "datasets", "TrainRidesCleaned.csv"), delimiter=";"
-    )
+
     columns.append("Refund Request")
-    data_reduced = data[columns]
+    data_reduced = processed_df[columns]
     data_reduced.to_csv(
         os.path.join(base_path, "datasets", "TrainRidesReduced.csv"), index=False
     )
 
     return data_reduced
+
+
+def load_model(model_name="model.pkl"):
+    """
+    Load the saved model
+
+    Args:
+        model_name (str, optional): Defaults to "model.pkl".
+
+    Returns:
+        model
+    """
+    base_path = Path().resolve()
+    model_path = os.path.join(base_path, "log_regression")
+    os.makedirs(model_path, exist_ok=True)
+
+    with open(os.path.join(base_path, model_path, "model.pkl"), "rb") as f:
+        loaded_model = pickle.load(f)
+    return loaded_model

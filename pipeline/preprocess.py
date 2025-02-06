@@ -21,13 +21,16 @@ def main(args):
 
     processed_df = process_time(cleaned_df)
 
+    # Feature selection if columns are passed
     if args.columns:
-        processed_df = reduce_columns(args.columns)
+        processed_df = reduce_columns(processed_df, args.columns)
 
+    # Split dataset into data and labels
     data, labels = transformation(processed_df, save_encoder_flag=True)
 
     data_file_path, label_file_path = save_csv_files(data, labels)
 
+    # Split into train and test datasets
     X_train, X_test, y_train, y_test = split_dataset(
         data_file_path, label_file_path, args.test_size, random_state=args.random_state
     )

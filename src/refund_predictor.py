@@ -1,24 +1,28 @@
-import pickle
-import os
 import pandas as pd
 
-from src.schemas import TransactionData, InferenceData
-from utils.main_utils import process_time, transformation
+from src.schemas import TransactionData
+from utils.main_utils import clean_dataset, process_time, transformation, load_model
 
 
 def data_process(transaction_data: TransactionData):
-    """_summary_
+    """Preprocessing and inference of the API request
 
     Args:
-        transaction_data (TransactionData): _description_
+        transaction_data (TransactionData): Features returned from API
+
+    Returns: result (Dictionary): Predicted refund request
     """
     # Create DataFrame from list of TransactionData objects
     df = transaction_data.to_dataframe()
 
-    processed_df = process_time(df)
+    # Process the data
+    cleaned_df = clean_dataset(df)
+
+    processed_df = process_time(cleaned_df)
 
     data = transformation(processed_df, load_encoder_flag=True)
 
+    # Make the prediction
     prediction = perform_inference(data)
 
     result = {"Refund Request": prediction}
@@ -27,24 +31,19 @@ def data_process(transaction_data: TransactionData):
 
 
 def perform_inference(data: pd.DataFrame):
-    """_summary_
+    """Makes the prediction
 
     Args:
-        data (pd.DataFrame): _description_
+        data (pd.DataFrame): Cleaned and transformed dataframe
+
+    Returns: String: Yes or No based on the prediction
     """
-    with open(os.path.join("log_regression", "model.pkl"), "rb") as f:
-        loaded_model = pickle.load(f)
-
-    # Convert DataFrame to a 1D NumPy array of shape (15,)
-    data_array = data.values.flatten()
-
-    # Ensure the correct shape
-    if data_array.shape[0] != 15:
-        raise ValueError(f"Expected input shape (15,), but got {data_array.shape}")
+    loaded_model = load_model()["model"]
 
     # Make Prediction
-    pred_prob = loaded_model.predict(data_array.reshape(1, -1))  # Reshape to (1, 15)
+    pred_prob = loaded_model.predict(data.values)
 
+    # Assign 0 or 1 based on probability
     pred = (pred_prob >= 0.5).astype(int)
 
     return "Yes" if pred[0] == 1 else "No"

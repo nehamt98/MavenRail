@@ -24,17 +24,17 @@ conda activate mavenrail_venv
 
 ## Preprocess data
 ```
-python preprocess.py --filename TrainRidesCleaned.csv --test_size 0.1 --random_state 42
+python -m pipeline.preprocess --filename TrainRidesCleaned.csv --test_size 0.1 --random_state 42
 ```
 
 ## Train model
 ```
-python train.py
+python -m pipeline.train
 ```
 
 ## Inference
 ```
-python inference.py
+python -m pipeline.inference
 ```
 ## run pre-commits
 ```
