@@ -1,0 +1,4 @@
+# Add parameter
+[model_params]
+method = "newton"
+maxiter = 35
