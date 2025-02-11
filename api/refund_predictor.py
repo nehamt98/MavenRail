@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.schemas import TransactionData
+from api.schemas import TransactionData
 from utils.main_utils import clean_dataset, process_time, transformation, load_model
 
 

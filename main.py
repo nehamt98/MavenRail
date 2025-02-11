@@ -2,8 +2,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 import uvicorn
 
-from src.schemas import TransactionData, InferenceData
-from src.refund_predictor import data_process
+from api.schemas import TransactionData, InferenceData
+from api.refund_predictor import data_process
 
 app = FastAPI(
     title="MavenRail",

@@ -25,7 +25,9 @@ def load_dataset(filename: str) -> pd.DataFrame:
     base_path = Path().resolve()
 
     try:
-        df = pd.read_csv(os.path.join(base_path, "datasets", filename), delimiter=";")
+        df = pd.read_csv(
+            os.path.join(base_path, "datasets", "raw", filename), delimiter=";"
+        )
     except Exception as e:
         logger.error(e)
 
@@ -42,9 +44,12 @@ def clean_dataset(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The cleaned dataset
     """
-    df["Railcard"] = df["Railcard"].fillna("None")
-    df["Reason for Delay"] = df["Reason for Delay"].fillna("Not Delayed")
-    df["Reason for Delay"] = df["Reason for Delay"].replace("NA", "Not Delayed")
+    if "Railcard" in df.columns:
+        print(df)
+        df["Railcard"] = df["Railcard"].fillna("None")
+    if "Reason for Delay" in df.columns:
+        df["Reason for Delay"] = df["Reason for Delay"].fillna("Not Delayed")
+        df["Reason for Delay"] = df["Reason for Delay"].replace("NA", "Not Delayed")
 
     return df
 
@@ -240,9 +245,11 @@ def save_csv_files(data: pd.DataFrame, labels: pd.DataFrame):
     File paths
     """
     base_path = Path().resolve()
+    data_path = os.path.join(base_path, "datasets", "processed")
+    os.makedirs(data_path, exist_ok=True)
 
-    data_file_path = os.path.join(base_path, "datasets", "data.csv")
-    labels_file_path = os.path.join(base_path, "datasets", "labels.csv")
+    data_file_path = os.path.join(data_path, "data.csv")
+    labels_file_path = os.path.join(data_path, "labels.csv")
 
     data.to_csv(data_file_path, index=False)
     labels.to_csv(labels_file_path, index=False)
@@ -333,12 +340,12 @@ def reduce_columns(processed_df, columns):
         pd.DataFrame: Reduced dataframe
     """
     base_path = Path().resolve()
+    data_path = os.path.join(base_path, "datasets", "processed")
+    os.makedirs(data_path, exist_ok=True)
 
     columns.append("Refund Request")
     data_reduced = processed_df[columns]
-    data_reduced.to_csv(
-        os.path.join(base_path, "datasets", "TrainRidesReduced.csv"), index=False
-    )
+    data_reduced.to_csv(os.path.join(data_path, "TrainRidesReduced.csv"), index=False)
 
     return data_reduced
 
