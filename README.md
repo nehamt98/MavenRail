@@ -34,11 +34,6 @@ conda create --name mavenrail_venv python=3.12
 conda activate mavenrail_venv
 ```
 
-### Install dependencies
-```bash
-conda env create -f environment.yml
-```
-
 ### To update the environment.yml
 ```bash
 conda env export | grep -v "^prefix: " > environment.yml
