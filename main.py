@@ -1,17 +1,22 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
-import uvicorn
 
 from api.schemas import TransactionData, InferenceData
 from api.refund_predictor import data_process
 
+# Mangum only needed for Lambda
+try:
+    from mangum import Mangum
+except ImportError:
+    Mangum = None  # Safe fallback for local builds
+
 app = FastAPI(
     title="MavenRail",
-    description="Predict the status of refund request based on based on various ticket-related factors",
+    description="Predict the status of refund request based on various ticket-related factors",
     version="2.5.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/docs",
-    redoc_url=None,  # Disable ReDoc
+    redoc_url=None,
 )
 
 
@@ -29,5 +34,11 @@ async def create_transaction(transaction: TransactionData):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# Create Mangum handler only if Mangum is available
+if Mangum:
+    handler = Mangum(app)
+
 if __name__ == "__main__":
+    import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

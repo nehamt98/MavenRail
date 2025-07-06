@@ -106,3 +106,4 @@ virtualenv==20.29.1
 wcwidth==0.2.13
 webencodings==0.5.1
 zipp==3.21.0
+mangum==0.19.0
