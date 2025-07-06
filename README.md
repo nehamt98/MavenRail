@@ -105,14 +105,26 @@ This project serves as a foundation for a more advanced refund prediction system
 
 ## Docker
 
-running locally -
+To run the FAST Api locally.
 
+```
 docker build -f Dockerfile.local -t mavenrail-app-local .
 docker run -d -p 8000:8000 mavenrail-app-local
+```
 
+To view the swagger page, click on http://localhost:8000/docs.
 
-running lambda - tag and deploy
+### Build and Deploy to AWS ECR
 
-docker build -f Dockerfile.lambda -t mavenrail-app-lambda .
-docker tag mavenrail-app-lambda <your_ecr_uri>:latest
-docker push <your_ecr_uri>:latest
+# Login to ECR
+```
+aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 850995548171.dkr.ecr.eu-north-1.amazonaws.com
+
+# Build and push
+docker buildx build --platform linux/amd64 -f Dockerfile.lambda -t 850995548171.dkr.ecr.eu-north-1.amazonaws.com/mavenrail-repo:latest --push .
+
+# Check pushed image (optional)
+aws ecr describe-images --repository-name mavenrail-repo --region eu-north-1
+```
+
+Once the image is deployed on AWS ECR, create an AWS function using the deployed container image.
