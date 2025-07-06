@@ -102,3 +102,17 @@ This project provides a functional machine learning pipeline for predicting refu
 - **Hyperparameter Optimization:** The model is trained with default parameters. Tuning hyperparameters using methods like Grid Search or Bayesian Optimization could yield better results.
 
 This project serves as a foundation for a more advanced refund prediction system, and future improvements can significantly enhance its accuracy and usability.
+
+## Docker
+
+running locally -
+
+docker build -f Dockerfile.local -t mavenrail-app-local .
+docker run -d -p 8000:8000 mavenrail-app-local
+
+
+running lambda - tag and deploy
+
+docker build -f Dockerfile.lambda -t mavenrail-app-lambda .
+docker tag mavenrail-app-lambda <your_ecr_uri>:latest
+docker push <your_ecr_uri>:latest
