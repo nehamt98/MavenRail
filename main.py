@@ -4,11 +4,6 @@ from fastapi.responses import RedirectResponse
 from api.schemas import TransactionData, InferenceData
 from api.refund_predictor import data_process
 
-# Mangum only needed for Lambda
-try:
-    from mangum import Mangum
-except ImportError:
-    Mangum = None  # Safe fallback for local builds
 
 app = FastAPI(
     title="MavenRail",
@@ -34,11 +29,16 @@ async def create_transaction(transaction: TransactionData):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# Create Mangum handler only if Mangum is available
-if Mangum:
-    handler = Mangum(app)
+# Health check endpoint (good practice for Render)
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    
+    # Use PORT from environment (Render provides this)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
