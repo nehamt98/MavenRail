@@ -2,6 +2,8 @@
 
 This project builds a logistic regression-based machine learning pipeline to predict refund requests for UK rail journeys using the MavenRail dataset. It includes data preprocessing, model training, and inference, with a FastAPI service for serving the model via API endpoints.
 
+Access the endpoint here - https://mavenrail.onrender.com/
+
 ## Dataset Overview
 
 The MavenRail dataset originates from a fictional dataset developed for a data visualization competition hosted by Maven Analytics. It covers UK rail journeys from January 1 to April 30, 2024.
